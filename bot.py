@@ -8,9 +8,10 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.constants import ParseMode
 
-# --- KALICI HAFIZA ---
+# --- KALICI HAFIZA VE YÖNETİM KURULU ---
 VERI_DOSYASI = "katilimcilar.json"
-ADMIN_ID = 2073140443  
+# Senin ID'n ve diğer 4 yöneticinin ID'leri
+ADMINLER = [2073140443, 8766027090, 6989660804, 5656861374, 1293227694]
 TOKEN = "8846445960:AAFbbUCtECgiNC6snkMjt93eYLb5JykcVKw"
 
 def veri_yukle():
@@ -75,7 +76,9 @@ async def duzenle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔄 Bilgilerin güncellendi!")
 
 async def liste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
+    # YENİ YÖNETİCİ KONTROLÜ
+    if update.effective_user.id not in ADMINLER: return
+    
     global katilimcilar
     katilimcilar = veri_yukle()
     if not katilimcilar:
@@ -137,7 +140,9 @@ async def liste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(mesaj, parse_mode=ParseMode.HTML)
 
 async def all_etiketle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
+    # YENİ YÖNETİCİ KONTROLÜ
+    if update.effective_user.id not in ADMINLER: return
+    
     global katilimcilar
     katilimcilar = veri_yukle()
     if not katilimcilar: return
@@ -145,7 +150,9 @@ async def all_etiketle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📣 <b>TOPLANIN!</b>\n\n" + ", ".join(etiketler), parse_mode=ParseMode.HTML)
 
 async def temizle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
+    # YENİ YÖNETİCİ KONTROLÜ
+    if update.effective_user.id not in ADMINLER: return
+    
     veri_kaydet({})
     await update.message.reply_text("Liste sıfırlandı! 🧹")
 
@@ -154,7 +161,7 @@ flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def index():
-    return "Bot 7/24 Aktif! 🚀"
+    return "Bot 7/24 Aktif ve Yönetim Kurulu Görevde! 🚀"
 
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
@@ -169,7 +176,7 @@ def main():
     app.add_handler(CommandHandler("all", all_etiketle))
     app.add_handler(CommandHandler("temizle", temizle))
     
-    # Flask sunucusunu arka planda başlat (Render'ı açık tutmak için)
+    # Flask sunucusunu arka planda başlat
     threading.Thread(target=run_flask, daemon=True).start()
     
     print("Bot Kesintisiz Polling Modunda Başlıyor...")
