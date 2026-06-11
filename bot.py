@@ -10,7 +10,6 @@ from telegram.constants import ParseMode
 
 # --- KALICI HAFIZA VE YÖNETİM KURULU ---
 VERI_DOSYASI = "katilimcilar.json"
-# Senin ID'n ve diğer 4 yöneticinin ID'leri
 ADMINLER = [2073140443, 8766027090, 6989660804, 5656861374, 1293227694]
 TOKEN = "8846445960:AAFbbUCtECgiNC6snkMjt93eYLb5JykcVKw"
 
@@ -37,6 +36,7 @@ async def help_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👑 <b>YÖNETİCİ KOMUTLARI:</b>\n"
         "🔹 <code>/liste</code> (Otomatik 19 sınırına göre böler)\n"
         "🔹 <code>/liste [Sayı]</code> (Örn: /liste 4)\n"
+        "🔹 <code>/ekle İsim, Oyun, Sayı</code> (Dışarıdan üye ekler)\n"
         "🔹 <code>/all</code> (Herkesi etiketler)\n"
         "🔹 <code>/temizle</code> (Listeyi sıfırlar)"
     )
@@ -75,8 +75,28 @@ async def duzenle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     veri_kaydet(katilimcilar)
     await update.message.reply_text("🔄 Bilgilerin güncellendi!")
 
+# --- YENİ MANUEL EKLEME KOMUTU ---
+async def manuel_ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMINLER: return
+    
+    tam_metin = " ".join(context.args)
+    parcalar = [p.strip() for p in tam_metin.split(",")]
+    
+    if len(parcalar) != 3 or not parcalar[2].isdigit():
+        await update.message.reply_text("🛑 <b>Hatalı Format!</b>\nLütfen aralara virgül koyun.\nÖrnek: <code>/ekle Ahmet Yılmaz, IYI ROSE, 4</code>", parse_mode=ParseMode.HTML)
+        return
+        
+    isim, oyun, sayi = parcalar[0], parcalar[1], int(parcalar[2])
+    fake_id = f"manuel_{isim}" # Telegram ID'si olmayanlar için sahte ID
+    
+    global katilimcilar
+    katilimcilar = veri_yukle()
+    katilimcilar[fake_id] = [isim, oyun, sayi]
+    veri_kaydet(katilimcilar)
+    
+    await update.message.reply_text(f"✅ <b>{isim}</b> sisteme başarıyla eklendi!\n🎮 Oyun: {oyun}\n👥 Parti: {sayi}", parse_mode=ParseMode.HTML)
+
 async def liste(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # YENİ YÖNETİCİ KONTROLÜ
     if update.effective_user.id not in ADMINLER: return
     
     global katilimcilar
@@ -140,17 +160,23 @@ async def liste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(mesaj, parse_mode=ParseMode.HTML)
 
 async def all_etiketle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # YENİ YÖNETİCİ KONTROLÜ
     if update.effective_user.id not in ADMINLER: return
     
     global katilimcilar
     katilimcilar = veri_yukle()
     if not katilimcilar: return
-    etiketler = [f'<a href="tg://user?id={u}">{v[0]}</a>' for u, v in katilimcilar.items()]
+    
+    # Manuel eklenenlerin tg://user linki çalışmaz (gerçek ID'leri yok), o yüzden onları ayırıyoruz
+    etiketler = []
+    for u, v in katilimcilar.items():
+        if u.startswith("manuel_"):
+            etiketler.append(f"👤 {v[0]}")
+        else:
+            etiketler.append(f'<a href="tg://user?id={u}">{v[0]}</a>')
+            
     await update.message.reply_text("📣 <b>TOPLANIN!</b>\n\n" + ", ".join(etiketler), parse_mode=ParseMode.HTML)
 
 async def temizle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # YENİ YÖNETİCİ KONTROLÜ
     if update.effective_user.id not in ADMINLER: return
     
     veri_kaydet({})
@@ -172,11 +198,11 @@ def main():
     app.add_handler(CommandHandler(["start", "help"], help_komutu))
     app.add_handler(CommandHandler("parti", parti))
     app.add_handler(CommandHandler("duzenle", duzenle))
+    app.add_handler(CommandHandler("ekle", manuel_ekle)) # Manuel ekleme komutu
     app.add_handler(CommandHandler(["liste", "liste2", "liste3", "liste4", "liste5", "liste6", "liste7", "liste8"], liste))
     app.add_handler(CommandHandler("all", all_etiketle))
     app.add_handler(CommandHandler("temizle", temizle))
     
-    # Flask sunucusunu arka planda başlat
     threading.Thread(target=run_flask, daemon=True).start()
     
     print("Bot Kesintisiz Polling Modunda Başlıyor...")
